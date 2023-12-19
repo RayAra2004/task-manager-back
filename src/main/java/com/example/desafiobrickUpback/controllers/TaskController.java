@@ -1,10 +1,11 @@
 package com.example.desafiobrickUpback.controllers;
 
 import com.example.desafiobrickUpback.dtos.TaskRecordDto;
+import com.example.desafiobrickUpback.models.Status;
 import com.example.desafiobrickUpback.models.TaskModel;
-import com.example.desafiobrickUpback.services.TaskService;
+import com.example.desafiobrickUpback.repositories.TaskRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.validation.Valid;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -15,15 +16,19 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/task")
+@CrossOrigin(origins = "*")
 @Validated
 public class TaskController {
     @Autowired
-    TaskService taskService;
+    private TaskRepository taskRepository;
 
     @Autowired
     ObjectMapper objectMapper;
@@ -38,7 +43,26 @@ public class TaskController {
                     "status", status
                     )), TaskRecordDto.class
             );
-            taskService.registerTask(data, imageFile);
+
+            Status statusTask = (data.status().equalsIgnoreCase("pending")) ? Status.PENDING : Status.FINISHED;
+
+            byte[] imageData = null;
+            try{
+                if(imageFile != null && !imageFile.isEmpty()) {
+                    imageData = imageFile.getBytes();
+                }
+            }catch (IOException e){
+                throw new RuntimeException("Erro ao processar a imagem", e);
+            }
+
+            if (imageData == null) {
+                var newTaskModel = new TaskModel(data.description(), statusTask);
+                taskRepository.save(newTaskModel);
+            }else{
+                var newTaskModel = new TaskModel(data.description(), statusTask, imageData);
+                taskRepository.save(newTaskModel);
+            }
+
             return ResponseEntity.status(HttpStatus.CREATED).body("Tarefa criada com sucesso");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
@@ -47,7 +71,7 @@ public class TaskController {
 
     @GetMapping("/")
     public ResponseEntity<List<TaskModel>> getTasks(){
-        return ResponseEntity.ok(taskService.getTasks());
+        return ResponseEntity.ok(taskRepository.findAll());
     }
 
     @PutMapping("/{id}")
@@ -64,7 +88,29 @@ public class TaskController {
                             "id", id
                     )), TaskRecordDto.class
             );
-            taskService.updateTask(data, imageFile);
+            Optional<TaskModel> optionalTaskModel = taskRepository.findById(UUID.fromString(data.id()));
+
+            if(optionalTaskModel.isPresent()){
+                Status statusTask = (data.status().equalsIgnoreCase("pending")) ? Status.PENDING : Status.FINISHED;
+
+                byte[] imageData = null;
+                try{
+                    if(imageFile != null && !imageFile.isEmpty()) {
+                        imageData = imageFile.getBytes();
+                    }
+                }catch (IOException e){
+                    throw new RuntimeException("Erro ao processar a imagem", e);
+                }
+
+                TaskModel taskModel = optionalTaskModel.get();
+                taskModel.setDescription(data.description());
+                taskModel.setImage(imageData);
+                taskModel.setStatus(statusTask);
+
+            }else{
+                throw new EntityNotFoundException();
+            }
+
             return ResponseEntity.status(HttpStatus.OK).body("Tarefa atualizada com sucesso");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
@@ -75,7 +121,15 @@ public class TaskController {
     @Transactional
     public ResponseEntity finishTask(@PathVariable String id){
         try{
-            taskService.finishTask(id);
+            Optional<TaskModel> optionalTaskModel = taskRepository.findById(UUID.fromString(id));
+
+            if(optionalTaskModel.isPresent()){
+                TaskModel taskModel = optionalTaskModel.get();
+                taskModel.setStatus(Status.FINISHED);
+            }else{
+                throw new EntityNotFoundException();
+            }
+
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
         }catch (Exception e){
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
