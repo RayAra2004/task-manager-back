@@ -1,6 +1,7 @@
 package com.example.desafiobrickUpback.controllers;
 
 import com.example.desafiobrickUpback.dtos.TaskRecordDto;
+import com.example.desafiobrickUpback.models.TaskModel;
 import com.example.desafiobrickUpback.services.TaskService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
@@ -9,10 +10,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -37,6 +40,32 @@ public class TaskController {
             );
             taskService.registerTask(data, imageFile);
             return ResponseEntity.status(HttpStatus.CREATED).body("Tarefa criada com sucesso");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/")
+    public ResponseEntity<List<TaskModel>> getTasks(){
+        return ResponseEntity.ok(taskService.getTasks());
+    }
+
+    @PutMapping("/{id}")
+    @Transactional
+    public ResponseEntity updateTask(@PathVariable String id,
+                                     @RequestParam("description") @NotBlank String description,
+                                     @RequestParam("status") @NotBlank String status,
+                                     @RequestParam(value = "image", required = false) MultipartFile imageFile){
+        try{
+            TaskRecordDto data = objectMapper.readValue(
+                    objectMapper.writeValueAsString(Map.of(
+                            "description", description,
+                            "status", status,
+                            "id", id
+                    )), TaskRecordDto.class
+            );
+            taskService.updateTask(data, imageFile);
+            return ResponseEntity.status(HttpStatus.OK).body("Tarefa atualizada com sucesso");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
         }
