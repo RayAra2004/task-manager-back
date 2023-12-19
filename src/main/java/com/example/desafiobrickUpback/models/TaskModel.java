@@ -20,13 +20,20 @@ public class TaskModel {
     private UUID id;
     @Column(nullable = false)
     private String description;
-    private String image;
+    @Column(nullable = true, columnDefinition = "LONGBLOB")
+    private byte[] image;
     @Enumerated(EnumType.STRING)
     private Status status;
 
     public TaskModel(String description, Status status){
         this.description = description;
         this.status = status;
+    }
+
+    public TaskModel(String description, Status statusTask, byte[] image) {
+        this.description = description;
+        this.status = statusTask;
+        this.image = image;
     }
 }
 
