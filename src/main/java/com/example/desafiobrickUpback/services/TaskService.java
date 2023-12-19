@@ -70,4 +70,15 @@ public class TaskService {
            throw new EntityNotFoundException();
         }
     }
+
+    public void finishTask(String id){
+        Optional<TaskModel> optionalTaskModel = taskRepository.findById(UUID.fromString(id));
+
+        if(optionalTaskModel.isPresent()){
+            TaskModel taskModel = optionalTaskModel.get();
+            taskModel.setStatus(Status.FINISHED);
+        }else{
+            throw new EntityNotFoundException();
+        }
+    }
 }
